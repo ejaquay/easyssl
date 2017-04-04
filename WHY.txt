@@ -1,0 +1,46 @@
+
+Readers probably wonder why do we want something like a simplistic server 
+written in C when there are already a myriad of existing client server methods 
+for gathering and moving data.  Very common is to use https to communicate 
+with a secure web server.  The now infamous web based ACA system is an example.
+Or one could use a propritary messaging system.  Niether of these solutions 
+worked very well in the environments I was involved in while I was working.  
+
+I have over forty years of experiance as a systems guy in large manufacturing 
+environments.  A very big problem that I dealt with daily is that production 
+facilities have a lifetime of 50+ years while software, including operating 
+systems, has a lifetime of less than 10.  A typical large production facility 
+will involve thousands of data points, many PLC's connected by several 
+disparate Distributed Control Systems or SCADA's, each from different 
+suppliers.  A good portion of the control systems will be obsolete because 
+production equipment they support has outlived the vendors who supplied the 
+control. 
+
+What that means to an IT guy is you are maintaining and interfacing systems 
+built in the 60's and 70's and also systems built last year.  You are trying 
+to get order information down to the shop floor and production results up into 
+plant wide supervisory and accounting systems. There is no common solution.
+Try getting a web server running on a PDP8 or a vintage mainframe sometime.
+Or try pulling data over the network out of an obsolete version of Access 
+being loaded from proprietary laboratory equipment runing VB3 on a Windows 
+3.11 box.
+
+We were many times burned when a vendor's VMS based API for interfacing with 
+their proprietary shop floor system would not run on an Alpha or Itanium or
+even Unix and the vendor is either out of business or is unwilling to modify 
+their interface to run on what they consider to be an obsolete or little
+used system.
+
+What my peers and I did was to create custom interfaces.  Lots of them.  Some 
+used vendor supplied libraries, some used proprietary messaging, some used 
+Sun RPC, some Microsoft DCOM, some rsh or ssh.  Even FTP, screen scrapers, 
+and print spoolers were used to get and move data.  These interfaces were 
+all custom and were written by different in-house programmers over many 
+years.  A mess but a mess that worked and that could be maintained because 
+in-house programmers had the source code for the interfaces they wrote.
+
+One flaw with EASYSVR is it lacks any security.  If hackers can get into
+the local intranet it is running on they could easily subvert it.  To address
+this I created an SSL enabled version, EASYSSL. This more as an exercise than 
+practicality, I don't have any current customers because I am retired.
+
