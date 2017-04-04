@@ -1,10 +1,11 @@
 
-Readers probably wonder why do we want something like a simplistic server 
-written in C when there are already a myriad of existing client server methods 
-for gathering and moving data.  Very common is to use https to communicate 
-with a secure web server.  The now infamous web based ACA system is an example.
-Or one could use a propritary messaging system.  Niether of these solutions 
-worked very well in the environments I was involved in while I was working.  
+Readers probably wonder who would want a simplistic server written in C 
+when there are already a myriad of existing client server methods for 
+gathering and moving data between networked systems.  Very common is to 
+use https to communicate with a secure web server. The now infamous web 
+based ACA system is an example. Or one could use a propritary messaging 
+system.  Niether of these solutions worked very well in the environments 
+I was involved in while I was working.  
 
 I have over forty years of experiance as a systems guy in large manufacturing 
 environments.  A very big problem that I dealt with daily is that production 
@@ -36,11 +37,17 @@ used vendor supplied libraries, some used proprietary messaging, some used
 Sun RPC, some Microsoft DCOM, some rsh or ssh.  Even FTP, screen scrapers, 
 and print spoolers were used to get and move data.  These interfaces were 
 all custom and were written by different in-house programmers over many 
-years.  A mess but a mess that worked and that could be maintained because 
-in-house programmers had the source code for the interfaces they wrote.
+years. Typically the server part would run on some device that controlled
+a process or got data from it. The client was typically running on a higher
+level system in the process control hierarchy. Having all those different ways
+of serving data was a mess but a mess that worked and that could be maintained 
+because the maintainers had the source code for the interfaces.
 
-One flaw with EASYSVR is it lacks any security.  If hackers can get into
-the local intranet it is running on they could easily subvert it.  To address
-this I created an SSL enabled version, EASYSSL. This more as an exercise than 
-practicality, I don't have any current customers because I am retired.
+I wrote EASYSVR eight years ago to make creating network servers that could
+run on pretty much anything with a IP stack.  As far as I know it is still 
+in constant used today. One flaw with EASYSVR was it lacked any security. If 
+hackers can get into the local intranet it is running on they could easily 
+subvert it. To address this I recently created this SSL enabled version, 
+EASYSSL. It may be instructive to compare the code for EASYSSL with the one for
+EASYSVR.  They are remarkably simular.
 
