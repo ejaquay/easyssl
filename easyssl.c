@@ -24,11 +24,11 @@
    in this Software without prior written authorization from Edward Jaquay.
 
    24-Feb-13 EJJ Adapt for Windows Sockets API 
-   02-Apr-17 EJJ Add SSL components, rename to easyssl from ejserver
+   02-Apr-17 EJJ Add SSL components
 
-   This module implements a tcpip service that accepts ascii strings as
+   This module implements a tcpip service that accepts ASCII strings as
    messages from clients and passes the strings to a user supplied client  
-   handler for processing. Messages are terminated by CR, LF, or EOF (^D)
+   handler for processing. Messages are terminated by NULL, CR, LF, or ^D
 
    The easyssl routine accepts two arguments, an integer port number and a 
    pointer to the user supplied client handler routine.
@@ -105,9 +105,8 @@ void easyssl_exit(void)
 {
     int clnt;
     for (clnt = 0; clnt < MAXCL; clnt++) {
-        if (IPCL[clnt].inbuf)
-            free(IPCL[clnt].inbuf);
         easyssl_drop(&IPCL[clnt]);
+        if (IPCL[clnt].inbuf) free(IPCL[clnt].inbuf);
     }
 #ifdef WIN32
     WSACleanup();
@@ -340,12 +339,13 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
         /* Search clients for input activity */
         for (clnt = 0; clnt < MAXCL; clnt++) {
 
-            if (!(csock = IPCL[clnt].sock))
-                continue;       /* Skip unused client slots */
-            if (!FD_ISSET(csock, &fds))
-                continue;       /* Skip inactive cliets     */
+            /* Skip unused client slots */
+            if (!(csock = IPCL[clnt].sock)) continue;
 
-            /* Insure buffer address is not NULL */
+            /* Skip inactive clients */
+            if (!FD_ISSET(csock, &fds)) continue;
+
+            /* Get buffer address. Must not be NULL */
             if ((bptr = IPCL[clnt].inbuf) == NULL) {
                 fprintf(stderr, "Internal buffer error\n");
                 exit(1);
@@ -360,7 +360,6 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             }
 
             /* Get data from client */
-            //cnt = recv(csock, bptr + IPCL[clnt].bcnt, bfree, 0);
             cnt = SSL_read(IPCL[clnt].ssl, bptr + IPCL[clnt].bcnt, bfree);
 
             if (cnt > 0) {
