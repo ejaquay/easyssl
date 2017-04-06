@@ -260,7 +260,7 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
 
             /* Drop timed out clients */
             for (clnt = 0; clnt < MAXCL; clnt++) {
-                if (csock = IPCL[clnt].sock) {
+                if ((csock = IPCL[clnt].sock)) {
                     if ((IPCL[clnt].toct += 1) > 9) {
                         (*dispatch) (CLIENT_TIMEOUT, &IPCL[clnt]);
                         easyssl_drop(&IPCL[clnt]);
@@ -301,7 +301,7 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
                 /* Input buffers are allocated dynamically as needed.  */
                 /* Once used buffers are not freed until program exit. */
                 if (IPCL[clnt].inbuf == NULL) {
-                    if (bptr = malloc(BSIZ)) {
+                    if ((bptr = malloc(BSIZ))) {
                         IPCL[clnt].inbuf = bptr;
                     } else {
                         fprintf(stderr, "Memory error %s\n",
@@ -375,7 +375,7 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             }
 
             /* Look for a data terminator */
-            if (tptr = my_findterm(bptr, IPCL[clnt].bcnt)) {
+            if ((tptr = my_findterm(bptr, IPCL[clnt].bcnt))) {
 
                 /* Save the terminator that was sent */ 
                 /* then null terminate the buffer    */
