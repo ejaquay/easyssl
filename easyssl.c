@@ -25,6 +25,7 @@
 
    24-Feb-13 EJJ Adapt for Windows Sockets API 
    02-Apr-17 EJJ Add SSL components
+   06-Apr-17 EJJ Eliminate check for ^D. Client handler can check if needed.
 
    This module implements a tcpip service that accepts ASCII strings as
    messages from clients and passes the strings to a user supplied client  
@@ -113,15 +114,33 @@ void easyssl_exit(void)
 #endif
 }
 
-/* Look for data terminator in a client input buffer */
-static char *my_findterm(char *buf, int len)
+/* Look for end of data mark in client message. This could be changed */
+/* to look for the end of a counted string to allow for binary data  */
+/* Returns location of end of data or zero if not found */
+
+static char *my_findterm(struct ipclient *cl)
 {
+    int len;
+    char *buf;
+
+    /* Only need to look in part of message just read */
+    len = cl->rdcnt;
+    buf = cl->bptr;
+
     while (len-- > 0) {
         switch (*buf) {
         case '\0':
+            return buf;
         case '\n': 
         case '\r': 
-        case '\004': 
+        case '\004':
+            /* Null terminate data for client handler.   */
+            /* Preserve non-null terminator if possible. */
+            if (cl->bcnt < BSIZ) {
+                buf++;
+                cl->bcnt += 1;
+            }
+            *buf = '\0';
             return buf;
         }
         buf++;
@@ -131,24 +150,20 @@ static char *my_findterm(char *buf, int len)
 
 void easyssl(int port, void (*dispatch) (int, struct ipclient *))
 {
-    struct sockaddr_in lsadr;   /* Listen sock addr  */
-    struct sockaddr_in csadr;   /* Client sock addr  */
-    struct timeval tmo;         /* Timeout value     */
-    fd_set fds;                 /* Generic fd set    */
-    time_t ctime;               /* Current unix time */
-    time_t ptime;               /* Prev. unix time   */
-    char *bptr;                 /* Buffer pointer    */
-    char *tptr;                 /* Terminator pointer*/
-    char termchr;               /* Terminator char   */
-    int bfree;                  /* Buffer free space */
-    int clnt;                   /* Client number     */
-    int csock;                  /* Client socket     */
-    int lsock;                  /* Listen socket     */
-    int setbits;                /* Set true          */
-    int cnt;                    /* Number of bytes   */
-    int selcnt;                 /* Number selected   */
-    SSL_CTX *ctx;               /* ssl context       */
-    SSL *ssl;                   /* ssl client handle */
+    struct sockaddr_in lsadr;   /* Listen sock addr   */
+    struct sockaddr_in csadr;   /* Client sock addr   */
+    struct timeval tmo;         /* Timeout value      */
+    fd_set fds;                 /* Generic fd set     */
+    time_t ctime;               /* Current unix time  */
+    time_t ptime;               /* Prev. unix time    */
+    char termchr;               /* Terminator char    */
+    int bfree;                  /* Buffer free space  */
+    int clnt;                   /* Client number      */
+    int csock;                  /* Client socket      */
+    int lsock;                  /* Listen socket      */
+    int selcnt;                 /* fd selected count  */
+    SSL_CTX *ctx;               /* ssl context        */
+    SSL *ssl;                   /* ssl client handle  */
 
 /***********************************/
 /*         Initialize              */
@@ -208,9 +223,8 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
 #endif
 
     /* Allow reuse of address */
-    setbits = -1;
-    setsockopt(lsock, SOL_SOCKET, SO_REUSEADDR, (char *) &setbits,
-               sizeof setbits);
+    int setbits = 1;
+    setsockopt(lsock, SOL_SOCKET,SO_REUSEADDR, &setbits, sizeof (setbits));
 
     /* Bind to the port */
     lsadr.sin_family = AF_INET;
@@ -261,7 +275,7 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             /* Drop timed out clients */
             for (clnt = 0; clnt < MAXCL; clnt++) {
                 if ((csock = IPCL[clnt].sock)) {
-                    if ((IPCL[clnt].toct += 1) > 9) {
+                    if ((IPCL[clnt].tictoc += 1) > 9) {
                         (*dispatch) (CLIENT_TIMEOUT, &IPCL[clnt]);
                         easyssl_drop(&IPCL[clnt]);
                     }
@@ -272,8 +286,7 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             (*dispatch) (TIMER_EXPIRED, NULL);
         }
 
-        if (selcnt < 1)
-            continue;
+        if (selcnt < 1) continue;
 
 /***********************************/
 /*    Connection request           */
@@ -282,8 +295,8 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
         if (FD_ISSET(lsock, &fds)) {
 
             /* Accept the connection */
-            cnt = sizeof(csadr);
-            csock = accept(lsock, (struct sockaddr *) &csadr, &cnt);
+            socklen_t sasiz = sizeof(csadr);
+            csock = accept(lsock, (struct sockaddr *) &csadr, &sasiz);
 
             /* Find slot for the socket */
             for (clnt = 0; clnt < MAXCL; clnt++) {
@@ -301,11 +314,9 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
                 /* Input buffers are allocated dynamically as needed.  */
                 /* Once used buffers are not freed until program exit. */
                 if (IPCL[clnt].inbuf == NULL) {
-                    if ((bptr = malloc(BSIZ))) {
-                        IPCL[clnt].inbuf = bptr;
-                    } else {
-                        fprintf(stderr, "Memory error %s\n",
-                                strerror(errno));
+                    IPCL[clnt].inbuf=malloc(BSIZ);
+                    if (IPCL[clnt].inbuf == NULL) {
+                        perror("malloc error");
                         exit(1);
                     }
                 }
@@ -322,9 +333,9 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
                     IPCL[clnt].cid = clnt + 1;
                     IPCL[clnt].sock = csock;
                     IPCL[clnt].ip = csadr.sin_addr;
-                    IPCL[clnt].port = csadr.sin_port;
                     IPCL[clnt].bcnt = 0;
-                    IPCL[clnt].toct = 0;
+                    IPCL[clnt].tictoc = 0;
+                    IPCL[clnt].overflow = 0;
                     IPCL[clnt].ssl = ssl;
                     FD_SET(csock, &RDSET);
                     (*dispatch) (CLIENT_CONNECT, &IPCL[clnt]);
@@ -332,9 +343,9 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             }
         }
 
-/***********************************/
-/*    Data from client             */
-/***********************************/
+/*************************************/
+/*   Check for data from clients     */
+/*************************************/
 
         /* Search clients for input activity */
         for (clnt = 0; clnt < MAXCL; clnt++) {
@@ -346,53 +357,43 @@ void easyssl(int port, void (*dispatch) (int, struct ipclient *))
             if (!FD_ISSET(csock, &fds)) continue;
 
             /* Get buffer address. Must not be NULL */
-            if ((bptr = IPCL[clnt].inbuf) == NULL) {
+            if (IPCL[clnt].inbuf == NULL) {
                 fprintf(stderr, "Internal buffer error\n");
                 exit(1);
             }
 
-            /* Check for space in buffer */
+            /* Establish buffer read pointer */
+            IPCL[clnt].bptr = IPCL[clnt].inbuf + IPCL[clnt].bcnt;
+
+            /* Check space in buffer */
             bfree = BSIZ - IPCL[clnt].bcnt;
-            if (bfree < 1) {
+            if (bfree < 4) {
                 (*dispatch) (CLIENT_OVERFL, &IPCL[clnt]);
                 IPCL[clnt].bcnt = 0;
+                IPCL[clnt].overflow = 1;
                 continue;
             }
-
+ 
             /* Get data from client */
-            cnt = SSL_read(IPCL[clnt].ssl, bptr + IPCL[clnt].bcnt, bfree);
+            IPCL[clnt].rdcnt = SSL_read(IPCL[clnt].ssl,IPCL[clnt].bptr,bfree);
 
-            if (cnt > 0) {
-                IPCL[clnt].bcnt += cnt; /* Add to buffer content     */
-                IPCL[clnt].toct = 0;    /* Clear timout counter      */
+            if (IPCL[clnt].rdcnt > 0) {
+                IPCL[clnt].bcnt += IPCL[clnt].rdcnt; /* Add to buffer content */
+                IPCL[clnt].tictoc = 0;               /* Clear timout counter  */
 
             } else {
-                if (cnt < 0)
-                    perror("SSL_read");
+                if (IPCL[clnt].rdcnt < 0) perror("SSL_read");
                 (*dispatch) (CLIENT_ERROR, &IPCL[clnt]);
                 easyssl_drop(&IPCL[clnt]);
                 continue;
             }
 
-            /* Look for a data terminator */
-            if ((tptr = my_findterm(bptr, IPCL[clnt].bcnt))) {
-
-                /* Save the terminator that was sent */ 
-                /* then null terminate the buffer    */
-                termchr = *tptr;
-                *tptr = '\0';
-
-                /* If there is data call client handler with it */
-                if (tptr > bptr) {
+            /* Check for end of client message */
+            if (my_findterm(&IPCL[clnt])) {
+                if (!(IPCL[clnt].overflow)) { 
                     (*dispatch) (CLIENT_DATA, &IPCL[clnt]);
                 }
-
-                /* If terminator was EOD let client handler know */
-                if (termchr == '\004') {
-                    (*dispatch) (CLIENT_EOD, &IPCL[clnt]);
-                }
-
-                /* Clear the buffer */
+                IPCL[clnt].overflow = 0;
                 IPCL[clnt].bcnt = 0;
 
             }                   /* End if data terminator */

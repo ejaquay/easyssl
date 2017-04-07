@@ -1,4 +1,8 @@
-simple: simple.o easyssl.o easyssl.h
-	cc -o simple simple.o easyssl.o -lssl
+
+simple: simple.c easyssl.o easyssl.h
+	cc -o simple simple.c easyssl.o -lssl
+
+easyssl.o: easyssl.c easyssl.h
+
 clean:
-	rm -f simple simple.o easyssl.o 
+	rm -f simple easyssl.o 

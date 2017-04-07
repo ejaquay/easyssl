@@ -3,7 +3,7 @@
 /* Example secure server responds to hello, path, and goodby     */
 /*                                                               */
 /* Use make to build, test with                                  */ 
-/*     'openssl s_client -connect <hostname>:6666'               */
+/*     'openssl s_client -ign_eof -connect <hostname>:6666'      */
 /*                                                               */
 /* Server requires key.pem and cert.pem certificates.            */
 /*                                                               */
@@ -33,13 +33,19 @@ void client_handler(int event, struct ipclient *cl)
         break;
 
     /* Client has been disconnected for some reason. */
-    case CLIENT_EOD:
     case CLIENT_ERROR:
     case CLIENT_TIMEOUT:
 
         printf("Client %d dropped\n", cl->cid);
         break;
 
+    /* Client buffer overflow */
+    case CLIENT_OVERFL:
+
+        printf("Client %d data overflow\n", cl->cid);
+        easyssl_send(cl, "*** Buffer overflow ****\n> ");
+        break;
+ 
     /* Client sent something. Respond as required.            */
     /* code to do real stuff (including auth) can be put here */
     case CLIENT_DATA:
@@ -59,9 +65,9 @@ void client_handler(int event, struct ipclient *cl)
             easyssl_drop(cl);
 
         } else {
-            easyssl_send(cl, "You said \"");
+            easyssl_send(cl, "You said:\n");
             easyssl_send(cl, cl->inbuf);
-            easyssl_send(cl, "\"\n> ");
+            easyssl_send(cl, "\n> ");
         }
         break;
     }

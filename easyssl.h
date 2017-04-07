@@ -1,6 +1,6 @@
 /* easyssl.h:   Header file for easy to use multi client ip server           
 
-   Copyright (c) 2010, 2016  Edward J Jaquay 
+   Copyright (c) 2010, 2017  Edward J Jaquay 
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -49,14 +49,16 @@ WSADATA WSAData;
 
 /* Structure for client control data. Passed to client handler */
 struct ipclient {
-    int cid;                    /* Client ID number     */
-    int sock;                   /* Client socket        */
-    char *inbuf;                /* Buffer address       */
-    struct in_addr ip;          /* Client IP addr       */
-    int port;                   /* Client port          */
-    int bcnt;                   /* Buffer data count    */
-    int toct;                   /* Time out counter     */
-    SSL *ssl;                   /* libssl client handle */
+    int cid;                    /* Client ID number       */
+    int sock;                   /* Client socket          */
+    struct in_addr ip;          /* Client IP addr         */
+    char *inbuf;                /* Buffer address         */
+    char *bptr;                 /* Buffer read pointer    */
+    int rdcnt;                  /* Bytes read from client */
+    int bcnt;                   /* Total byte count       */
+    int tictoc;                 /* Time out counter       */
+    int overflow;               /* Buffer overflowed      */
+    SSL *ssl;                   /* libssl client handle   */
 };
 
 /* BSIZ establishes the maximum size of client messages. If a  */
@@ -75,7 +77,7 @@ struct ipclient {
 #define TIMER_EXPIRED  0
 #define CLIENT_CONNECT 1
 #define CLIENT_DATA    2
-#define CLIENT_EOD     3
+#define CLIENT_spare   3  /* Was EOD */
 #define CLIENT_ERROR   4
 #define CLIENT_OVERFL  5
 #define CLIENT_TIMEOUT 6
